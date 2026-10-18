@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PAC·AGENTS — Pac-Man แบบ Multi-Agent</title>
+<meta name="description" content="เกม Pac-Man ที่ผีเป็น Multi-Agent ร่วมมือกันไล่ล่า เก็บเหรียญ ซื้อสกิน เลือกความยาก เล่นได้ทันทีบนเบราว์เซอร์">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="bg-fx" aria-hidden="true"></div>
+
+<div id="app">
+  <div id="stage">
+    <section id="gameCol">
+      <div id="hud">
+        <div class="hud-item"><span class="lbl">SCORE</span><b id="hScore">0</b></div>
+        <div class="hud-item"><span class="lbl">BEST</span><b id="hHi">0</b></div>
+        <div class="hud-item"><span class="lbl">LEVEL</span><b id="hLevel">1</b></div>
+        <div class="hud-item"><span class="lbl">LIVES</span><b id="hLives" class="lives">♥♥♥</b></div>
+        <div class="hud-item coin"><span class="lbl">COINS</span><b id="hCoins">0</b></div>
+        <div class="hud-btns">
+          <button id="btnShield" class="hud-btn" title="โล่กันผี (ใช้อัตโนมัติ)" disabled>🛡️<i id="cShield">0</i></button>
+          <button id="btnFreeze" class="hud-btn" title="แช่แข็งผี (Space)">❄️<i id="cFreeze">0</i></button>
+          <button id="btnDebug" class="hud-btn" title="Agent Inspector (B)">🧠</button>
+          <button id="btnMute" class="hud-btn" title="เสียง (M)">🔊</button>
+          <button id="btnPause" class="hud-btn" title="พัก (P / Esc)">⏸</button>
+        </div>
+      </div>
+
+      <div id="canvasBox">
+        <canvas id="game" aria-label="เขาวงกต Pac-Man"></canvas>
+        <div id="banner"></div>
+        <div id="modeTag"></div>
+        <div id="pauseOv" class="ov">
+          <div class="ov-card">
+            <h2>พักเกม</h2>
+            <button class="btn primary" id="pResume">▶ เล่นต่อ</button>
+            <button class="btn" id="pRestart">↻ เริ่มใหม่</button>
+            <button class="btn" id="pMenu">☰ กลับเมนู</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="speedBar">
+        <span>ความเร็ว AI</span>
+        <button data-speed="1" class="chip on">1×</button>
+        <button data-speed="2" class="chip">2×</button>
+        <button data-speed="4" class="chip">4×</button>
+        <button data-speed="8" class="chip">8×</button>
+      </div>
+
+      <div id="dpad" aria-hidden="true">
+        <button data-dir="up">▲</button>
+        <button data-dir="left">◀</button>
+        <button data-dir="down">▼</button>
+        <button data-dir="right">▶</button>
+      </div>
+      <p id="hint"></p>
+    </section>
+
+    <aside id="inspector"></aside>
+  </div>
+</div>
+
+<!-- ======================= MAIN MENU ======================= -->
+<section class="screen show" id="scrMenu">
+  <div class="menu-wrap">
+    <div class="logo" aria-label="PAC AGENTS">
+      <div class="logo-pac"><canvas id="logoPac" width="120" height="120"></canvas></div>
+      <h1><span>PAC</span><em>·</em><span class="g">AGENTS</span></h1>
+      <p class="tag">Pac-Man ที่ผีคิดเองและร่วมมือกันเป็น <b>Multi-Agent</b></p>
+    </div>
+    <div class="menu-stats">
+      <span class="pill coinpill"><i class="cn"></i> <b id="mCoins">0</b></span>
+      <span class="pill">🏆 <b id="mBest">0</b></span>
+    </div>
+    <div class="menu-btns">
+      <button class="btn primary big" data-mode="play">▶ เล่นเลย</button>
+      <button class="btn big" data-mode="2p">👥 2 ผู้เล่น (Pac vs ผี)</button>
+      <button class="btn big" data-mode="ai">🤖 ดู AI เล่นเอง</button>
+      <div class="menu-row">
+        <button class="btn" data-go="shop">🛒 ร้านค้า</button>
+        <button class="btn" data-go="lab">🧪 ห้องทดลอง</button>
+      </div>
+      <div class="menu-row">
+        <button class="btn" data-go="editor">🧱 สร้างแมพ</button>
+        <button class="btn" data-go="how">❓ วิธีเล่น</button>
+        <button class="btn" data-go="settings">⚙️</button>
+      </div>
+    </div>
+    <p class="foot">ทำด้วย HTML · CSS · JavaScript ล้วน — เปิดไฟล์ <code>index.html</code> เล่นได้เลย</p>
+  </div>
+</section>
+
+<!-- ======================= SETUP ======================= -->
+<section class="screen" id="scrSetup">
+  <div class="panel wide">
+    <div class="panel-head"><h2 id="setupTitle">ตั้งค่าเกม</h2><button class="x" data-back>✕</button></div>
+    <div class="field">
+      <label>ระดับความยาก</label>
+      <div id="diffCards" class="diff-cards"></div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>แมพ</label>
+        <div class="seg" id="segMap">
+          <button data-v="classic">คลาสสิก</button>
+          <button data-v="random">สุ่ม</button>
+          <button data-v="custom">ที่สร้างเอง</button>
+        </div>
+        <div class="seedrow" id="seedRow"><input id="seedInput" type="number" min="1" max="999999999" aria-label="Seed"><button class="chip" id="btnDice">🎲 สุ่ม seed</button></div>
+      </div>
+      <div class="field">
+        <label>จำนวนผี</label>
+        <div class="seg" id="segGhosts"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div>
+      </div>
+      <div class="field">
+        <label>สมองผี</label>
+        <label class="switch"><input type="checkbox" id="swCoord"><span class="knob"></span><span class="swtxt">ประสานงานเป็นทีม (แชร์ข้อมูล + แบ่งบทบาท)</span></label>
+        <small>ปิด = ผีแต่ละตัวคิดเอง ใช้บุคลิกประจำตัวและมองเห็นเฉพาะตัวเอง</small>
+      </div>
+      <div class="field">
+        <label>อัลกอริทึมหาเส้นทางของผี</label>
+        <div class="seg" id="segAlgo"><button data-v="bfs">BFS</button><button data-v="astar">A*</button><button data-v="greedy">Greedy</button></div>
+      </div>
+      <div class="field" id="fldDebug">
+        <label>Agent Inspector</label>
+        <label class="switch"><input type="checkbox" id="swDebug"><span class="knob"></span><span class="swtxt">แสดงเส้นทาง เป้าหมาย บทบาท และข้อความของผี</span></label>
+      </div>
+      <div class="field" id="fldLoadout">
+        <label>ไอเทมที่พก</label>
+        <label class="switch"><input type="checkbox" id="swShield"><span class="knob"></span><span class="swtxt">ใช้โล่กันผี (มี <b id="ldShield">0</b>)</span></label>
+        <small>❄️ แช่แข็งผี (มี <b id="ldFreeze">0</b>) — กด Space ระหว่างเล่น ซื้อได้ในร้านค้า</small>
+      </div>
+    </div>
+    <div class="coinhint" id="coinHint"></div>
+    <div class="row end">
+      <button class="btn" data-back>ย้อนกลับ</button>
+      <button class="btn primary big" id="btnStart">▶ เริ่มเกม</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SHOP ======================= -->
+<section class="screen" id="scrShop">
+  <div class="panel wide">
+    <div class="panel-head"><h2>🛒 ร้านค้า</h2><span class="pill coinpill"><i class="cn"></i> <b id="shopCoins">0</b></span><button class="x" data-back>✕</button></div>
+    <div class="tabs" id="shopTabs"></div>
+    <div class="shop-grid" id="shopGrid"></div>
+    <p class="muted" id="shopHint">เก็บเหรียญจากการเล่น: เม็ดทุกๆ 25 เม็ด, กินผี, ผลไม้, เหรียญที่ปรากฏในแมพ และโบนัสจบเกม ยิ่งยากยิ่งได้คูณเยอะ</p>
+  </div>
+</section>
+
+<!-- ======================= LAB ======================= -->
+<section class="screen" id="scrLab">
+  <div class="panel wide">
+    <div class="panel-head"><h2>🧪 ห้องทดลอง Multi-Agent</h2><button class="x" data-back>✕</button></div>
+    <p class="muted">ให้ AI Pac-Man เล่นซ้ำหลายรอบ (ชีวิตเดียว) แล้ววัดว่าทีมผีแบบไหนจับได้เร็วกว่า — ใช้เป็นข้อมูลประกอบรายงานได้</p>
+    <div class="grid2">
+      <div class="field"><label>การทดลอง</label>
+        <select id="labExp">
+          <option value="coord">ประสานงาน vs ไม่ประสานงาน</option>
+          <option value="algo">อัลกอริทึม: BFS vs A* vs Greedy</option>
+          <option value="count">จำนวนผี: 1 / 2 / 3 / 4 ตัว</option>
+          <option value="diff">ระดับความยากทั้งหมด</option>
+        </select></div>
+      <div class="field"><label>ความยาก (ยกเว้นการทดลองความยาก)</label>
+        <select id="labDiff"><option value="easy">ง่าย</option><option value="normal" selected>ปกติ</option><option value="hard">ยาก</option><option value="insane">โหด</option></select></div>
+      <div class="field"><label>จำนวนรอบต่อกลุ่ม</label>
+        <select id="labTrials"><option>10</option><option selected>20</option><option>40</option><option>80</option></select></div>
+      <div class="field"><label>เวลาสูงสุดต่อรอบ (วินาทีในเกม)</label>
+        <select id="labCap"><option>60</option><option selected>90</option><option>120</option><option>180</option></select></div>
+      <div class="field"><label>แมพ</label>
+        <select id="labMap"><option value="classic" selected>คลาสสิก</option><option value="random">สุ่มใหม่ทุกรอบ</option></select></div>
+    </div>
+    <div class="row"><button class="btn primary" id="labRun">▶ เริ่มทดลอง</button><button class="btn" id="labStop" disabled>■ หยุด</button><div class="progress"><div id="labBar"></div></div><span id="labPct" class="muted">0%</span></div>
+    <div id="labOut"></div>
+  </div>
+</section>
+
+<!-- ======================= EDITOR ======================= -->
+<section class="screen" id="scrEditor">
+  <div class="panel wide">
+    <div class="panel-head"><h2>🧱 สร้างแมพของคุณเอง</h2><button class="x" data-back>✕</button></div>
+    <div class="editor">
+      <canvas id="edCanvas" width="504" height="504"></canvas>
+      <div class="ed-side">
+        <div class="seg vert" id="edTools">
+          <button data-v="#" class="on">⬛ กำแพง</button>
+          <button data-v=".">• เม็ด</button>
+          <button data-v="o">◉ พาวเวอร์</button>
+          <button data-v=" ">▫ ทางว่าง</button>
+          <button data-v="P">🟡 จุดเริ่ม Pac</button>
+        </div>
+        <label class="switch"><input type="checkbox" id="edMirror" checked><span class="knob"></span><span class="swtxt">สมมาตรซ้าย-ขวา</span></label>
+        <div class="row wrap">
+          <button class="btn" id="edClassic">โหลดคลาสสิก</button>
+          <button class="btn" id="edRandom">สุ่ม</button>
+          <button class="btn" id="edFill">เติมเม็ด</button>
+          <button class="btn" id="edCheck">ตรวจสอบ</button>
+        </div>
+        <div class="row wrap">
+          <button class="btn primary" id="edSave">💾 บันทึก</button>
+          <button class="btn" id="edPlay">▶ เล่นแมพนี้</button>
+        </div>
+        <p id="edMsg" class="muted">คลิก/ลากเพื่อวาด บ้านผีตรงกลางแก้ไขไม่ได้ แถวที่ 10 ซ้าย-ขวาเว้นไว้ทำอุโมงค์วาร์ปได้</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= HOW TO ======================= -->
+<section class="screen" id="scrHow">
+  <div class="panel wide">
+    <div class="panel-head"><h2>❓ วิธีเล่น</h2><button class="x" data-back>✕</button></div>
+    <div class="how">
+      <div class="card"><h3>🎮 ควบคุม</h3>
+        <ul>
+          <li><b>เดิน:</b> ลูกศร หรือ WASD (มือถือ: ปัดหน้าจอ / ปุ่มลูกศร)</li>
+          <li><b>Space:</b> แช่แข็งผี 4 วินาที (ต้องซื้อไอเทมก่อน)</li>
+          <li><b>P / Esc:</b> พักเกม &nbsp; <b>B:</b> เปิด Agent Inspector &nbsp; <b>M:</b> ปิดเสียง</li>
+          <li><b>2 ผู้เล่น:</b> P1 ใช้ WASD คุม Pac-Man, P2 ใช้ลูกศรคุมผี Blinky</li>
+        </ul></div>
+      <div class="card"><h3>💰 เหรียญและร้านค้า</h3>
+        <ul>
+          <li>เหรียญทองที่โผล่ในแมพ = 1–3 เหรียญ (หายไปใน 11 วินาที)</li>
+          <li>กินเม็ดครบทุก 25 เม็ด, กินผี, ผลไม้, ผ่านด่าน และคะแนนตอนจบ → ได้เหรียญ</li>
+          <li>ยิ่งยากยิ่งได้เหรียญคูณ (ง่าย ×0.6 → โหด ×2.5)</li>
+          <li>เอาไปซื้อสกิน Pac-Man / ผี / ธีมแมพ / เอฟเฟกต์ / อัปเกรดถาวร / ไอเทม</li>
+        </ul></div>
+      <div class="card"><h3>👻 ผีเป็น Agent</h3>
+        <ul>
+          <li><b>Blinky</b> ไล่ตรงๆ · <b>Pinky</b> ดักข้างหน้า · <b>Inky</b> โอบล้อม · <b>Clyde</b> ขี้อาย</li>
+          <li>เปิด <b>ประสานงาน</b>: ผีแชร์ตำแหน่ง Pac-Man แล้วแบ่งบทบาท HUNTER / INTERCEPTOR / FLANKER / BLOCKER เป็นไดนามิก ถ้าหาไม่เจอจะกระจายกันกวาดพื้นที่</li>
+          <li>เปิด <b>Agent Inspector</b> (ปุ่ม 🧠) เพื่อดูเส้นทาง เป้าหมาย บทบาท และข้อความระหว่างผีแบบเรียลไทม์</li>
+          <li>กิน <b>พาวเวอร์</b> เพื่อให้ผีกลัวแล้วกลับไปกิน (คะแนนคูณ ×2 ต่อตัว)</li>
+        </ul></div>
+      <div class="card"><h3>🧪 โหมดพิเศษ</h3>
+        <ul>
+          <li><b>ดู AI เล่นเอง:</b> Pac-Man ตัดสินใจเองว่าจะเก็บอะไร หนีอะไร ปรับความเร็วได้ถึง 8×</li>
+          <li><b>ห้องทดลอง:</b> รันการจำลองจำนวนมากเพื่อเปรียบเทียบทีมผีแบบต่างๆ</li>
+          <li><b>สร้างแมพ:</b> วาดเขาวงกตเอง หรือสุ่มแมพสมมาตร แล้วเล่นได้ทันที</li>
+        </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SETTINGS ======================= -->
+<section class="screen" id="scrSettings">
+  <div class="panel">
+    <div class="panel-head"><h2>⚙️ ตั้งค่า</h2><button class="x" data-back>✕</button></div>
+    <div class="field"><label>เสียงเอฟเฟกต์ <b id="vSfx"></b></label><input type="range" id="rngSfx" min="0" max="1" step="0.05"></div>
+    <div class="field"><label>เสียงเพลง <b id="vMus"></b></label><input type="range" id="rngMus" min="0" max="1" step="0.05"></div>
+    <div class="field"><label>สถิติรวม</label><div id="statsBox" class="statsbox"></div></div>
+    <div class="row end"><button class="btn danger" id="btnReset">ล้างข้อมูลทั้งหมด</button></div>
+  </div>
+</section>
+
+<!-- ======================= GAME OVER ======================= -->
+<section class="screen" id="scrOver">
+  <div class="panel">
+    <div class="panel-head"><h2 id="overTitle">GAME OVER</h2></div>
+    <div id="overBody"></div>
+    <div class="row end wrap">
+      <button class="btn" id="oMenu">☰ เมนู</button>
+      <button class="btn" id="oShop">🛒 ร้านค้า</button>
+      <button class="btn primary" id="oAgain">↻ เล่นอีกครั้ง</button>
+    </div>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script src="js/util.js"></script>
+<script src="js/maze.js"></script>
+<script src="js/pathfinding.js"></script>
+<script src="js/agents.js"></script>
+<script src="js/world.js"></script>
+<script src="js/shop.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/lab.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
